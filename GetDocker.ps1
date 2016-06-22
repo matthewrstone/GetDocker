@@ -27,8 +27,9 @@ into one initial step when the directory is first created.  If anything is missi
 from this script feel free to make a pull request or log an issue for changes.
 #>
 param (
-    $Url = "https://aka.ms/tp5/b",
-    $Path = "C:\Program Files\Docker"
+    [String]$Url = "https://aka.ms/tp5/b",
+    [String]$Path = "C:\Program Files\Docker",
+    [Switch]$InstallCore
 )
 
 function prep_environment {
@@ -72,10 +73,11 @@ If (!(Get-WindowsFeature 'Containers').Installed) {
     If ((Get-WindowsFeature 'Containers').Installed) {
         prep_environment
         Write-Host "Windows feature 'Containers' successfully installed."
-        Write-Host "You must restart your computer. Type 'Restart-Computer -Force' to reboot"
-        Write-Host "then run this script again."
-        Write-Host "Exiting..."
-        break
+        Write-Host "You must restart your computer for changes to take effect."
+        Write-Host "Press any key to restart your server..."
+        # Seriously, I just stack overflowed this line right here for fancier reboot option.
+        $x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        Restart-Computer -Force
     } else {
         Write-Host "Windows feature 'Containers' did not install correctly.  Please try again."
         break
@@ -85,8 +87,16 @@ If (!(Get-WindowsFeature 'Containers').Installed) {
         download_docker
     }
     configure_service
-
 }
-
-
-
+If ($InstallCore) {
+    $provider_status = Get-PackageProvider ContainerImage -ErrorAction SilentlyContinue
+    If (!($provider_status)) {
+        Write-Host "Installing Container Image package provider..."
+        Install-PackageProvider ContainerImage -Force
+    }
+    $container_status = Get-ContainerImage WindowsServerCore
+    If (!($container_status)) {
+        Write-Host "Installing Server Core container image..."
+        Install-ContainerImage -Name WindowsServerCore
+    }
+}
